@@ -82,8 +82,8 @@ svdThresh' tau deltas t = go deltas (H.zeros (nMovies+1) (nUsers+1))
 
 -- | Shrink operator
 shrink :: Double -> H.Matrix Double -> H.Matrix Double
-shrink tau x = let (u,s,v) = H.fullSVD x
-                   s' = H.mapMatrix (\x->max (x-tau) 0) s
+shrink tau x = let (u,s,v) = H.thinSVD x
+                   s' = H.diag $ H.mapVector (\x->max (x-tau) 0) s
                in u `H.mXm` s' `H.mXm` H.trans v
 
 proj :: Observations -> H.Matrix Double -> H.Matrix Double
