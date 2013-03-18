@@ -92,17 +92,22 @@ proj t r =
 
 eps = 1e-4 -- SVT tolerance
 tau = 2000
+deltas = repeat 1.9
 
 main = do
     train:test:_ <- getArgs
-    trainD <- readMovieLens train
-    testD <- readMovieLens test
+    trainD' <- readMovieLens train
+    testD' <- readMovieLens test
+    let maps = buildMaps $ trainD' `M.union` testD'
+        trainD = remapIds maps trainD'
+        testD = remapIds maps testD'
     putStrLn "Training:" >> describeObservations trainD
     putStrLn "Test:" >> describeObservations testD
-    rSvd <- svdThresh eps tau (repeat 1.9) trainD
-    let preds = [ --("movie mean",    globalMovieMean trainD)
-                --, ("user mean",     globalUserMean trainD)
-                  ("SVD threshold", rSvd)
+
+    rSvd <- svdThresh eps tau deltas trainD
+    let preds = [ ("movie mean",    globalMovieMean trainD)
+                , ("user mean",     globalUserMean trainD)
+                , ("SVD threshold", rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
         putStrLn $ name++"\t"++show (rmse testD pred)
@@ -121,15 +126,18 @@ describeObservations obs = do
 readMovieLens :: FilePath -> IO Observations
 readMovieLens fname = do
     recs <- either error id . Csv.decodeWith decodeOpts False <$> BS.readFile fname
-    return $ remapIds $ M.unions $ map f $ V.toList recs
+    return $ M.unions $ map f $ V.toList recs
   where f :: (Int, Int, Int, Int) -> Observations
         f (user, movie, rating, _) =
             M.singleton (Movie movie, User user) (realToFrac rating)
 
 -- | Remap movie and user identifiers to domain starting with zero
-remapIds :: Observations -> Observations
-remapIds obs = M.mapKeys (\(m,u)->(movieMap M.! m, userMap M.! u)) obs
+buildMaps :: Observations -> (M.Map Movie Movie, M.Map User User)
+buildMaps obs = (movieMap, userMap)
   where mkMapping :: Ord a => [b] -> S.Set a -> M.Map a b
         mkMapping ids keys = M.fromList $ zip (S.toList keys) ids
         movieMap = mkMapping [Movie i | i <- [0..]] $ S.map fst $ M.keysSet obs
         userMap = mkMapping [User i | i <- [0..]] $ S.map snd $ M.keysSet obs
+
+remapIds :: (M.Map Movie Movie, M.Map User User) -> Observations -> Observations
+remapIds (movieMap, userMap) = M.mapKeys (\(m,u)->(movieMap M.! m, userMap M.! u))
