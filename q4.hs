@@ -68,6 +68,7 @@ svdThresh tol tau deltas t = do
                      / froebeniusNorm (proj t t')
         predict r (Movie m) (User u) = r H.@@> (m,u)
 
+-- | Generate a list of recommendation iterates @R_q@
 svdThresh' :: Double -> [Double] -> Observations -> [H.Matrix Double]
 svdThresh' tau deltas t = go deltas (H.zeros nMovies nUsers)
   where t' = obsToHMatrix t
@@ -76,12 +77,14 @@ svdThresh' tau deltas t = go deltas (H.zeros nMovies nUsers)
             let r1 = shrink tau y0
                 y1 = y0 `H.add` (d `H.scale` proj t (t' `H.sub` r1))
             in r1 : go deltas y1
-        shrink :: Double -> H.Matrix Double -> H.Matrix Double
-        shrink tau x = let (u,s,v) = H.fullSVD x
-                           s' = H.mapMatrix (\x->max (x-tau) 0) s
-                       in u `H.mXm` s' `H.mXm` v
         Movie nMovies = S.findMax $ S.map fst $ M.keysSet t
         User nUsers   = S.findMax $ S.map snd $ M.keysSet t
+
+-- | Shrink operator
+shrink :: Double -> H.Matrix Double -> H.Matrix Double
+shrink tau x = let (u,s,v) = H.fullSVD x
+                   s' = H.mapMatrix (\x->max (x-tau) 0) s
+               in u `H.mXm` s' `H.mXm` v
 
 proj :: Observations -> H.Matrix Double -> H.Matrix Double
 proj t = H.mapMatrixWithIndex f
