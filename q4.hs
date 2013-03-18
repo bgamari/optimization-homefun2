@@ -47,7 +47,7 @@ mixedMean obs a =
                 $ M.mapKeysWith (++) (\(m,u)->u) $ fmap (:[]) obs
 
 obsToHMatrix :: Observations -> H.Matrix Double
-obsToHMatrix obs = H.buildMatrix nMovies nUsers f
+obsToHMatrix obs = H.buildMatrix (nMovies+1) (nUsers+1) f
   where Movie nMovies = S.findMax $ S.map fst $ M.keysSet obs
         User nUsers   = S.findMax $ S.map snd $ M.keysSet obs
         f (m,u) = M.findWithDefault 0 (Movie m, User u) obs
@@ -70,7 +70,7 @@ svdThresh tol tau deltas t = do
 
 -- | Generate a list of recommendation iterates @R_q@
 svdThresh' :: Double -> [Double] -> Observations -> [H.Matrix Double]
-svdThresh' tau deltas t = go deltas (H.zeros nMovies nUsers)
+svdThresh' tau deltas t = go deltas (H.zeros (nMovies+1) (nUsers+1))
   where t' = obsToHMatrix t
         go :: [Double] -> H.Matrix Double -> [H.Matrix Double]
         go (d:deltas) y0 =
@@ -84,12 +84,14 @@ svdThresh' tau deltas t = go deltas (H.zeros nMovies nUsers)
 shrink :: Double -> H.Matrix Double -> H.Matrix Double
 shrink tau x = let (u,s,v) = H.fullSVD x
                    s' = H.mapMatrix (\x->max (x-tau) 0) s
-               in u `H.mXm` s' `H.mXm` v
+               in u `H.mXm` s' `H.mXm` H.trans v
 
 proj :: Observations -> H.Matrix Double -> H.Matrix Double
-proj t = H.mapMatrixWithIndex f
-  where f (m,u) r | (Movie m, User u) `M.member` t  = r
-                  | otherwise                       = 0
+proj t r =
+    obsToHMatrix $ M.mapWithKey (\(Movie m, User u) _ -> r H.@@> (m,u)) t
+
+eps = 1e-4 -- SVT tolerance
+tau = 2000
 
 main = do
     train:test:_ <- getArgs
@@ -97,7 +99,7 @@ main = do
     testD <- readMovieLens test
     putStrLn "Training:" >> describeObservations trainD
     putStrLn "Test:" >> describeObservations testD
-    rSvd <- svdThresh 0.1 0.2 (repeat 1) trainD
+    rSvd <- svdThresh eps tau (repeat 1.9) trainD
     let preds = [ --("movie mean",    globalMovieMean trainD)
                 --, ("user mean",     globalUserMean trainD)
                   ("SVD threshold", rSvd)
