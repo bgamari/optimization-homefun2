@@ -27,6 +27,10 @@ rmse obs pred =
     sqrt $ (F.sum $ map (\((m,u), r)->(r - pred m u)^2) $ M.assocs obs) / n
   where n = realToFrac $ M.size obs
 
+globalMean :: Observations -> Prediction
+globalMean obs = \m _ -> mu
+  where mu = mean $ VU.fromList $ M.elems obs
+
 globalMovieMean :: Observations -> Prediction
 globalMovieMean obs = \m _ -> M.findWithDefault 0 m movies
   where movies = fmap (mean . VU.fromList)
@@ -37,8 +41,11 @@ globalUserMean obs = \_ u -> M.findWithDefault 0 u users
   where users = fmap (mean . VU.fromList)
                 $ M.mapKeysWith (++) (\(m,u)->u) $ fmap (:[]) obs
 
-mixedMean :: Observations -> V2 Double -> Prediction
-mixedMean obs a =
+-- | Optimal mixture reported in Asendorf
+reportedMixture = V2 0.548 0.452 :: V2 Double
+
+mixedMean :: V2 Double -> Observations -> Prediction
+mixedMean a obs =
     \m u -> let p = V2 (M.findWithDefault 0 m movies) (M.findWithDefault 0 u users)
             in a `dot` p
   where movies = fmap (mean . VU.fromList)
@@ -90,7 +97,27 @@ proj :: Observations -> H.Matrix Double -> H.Matrix Double
 proj t r =
     obsToHMatrix $ M.mapWithKey (\(Movie m, User u) _ -> r H.@@> (m,u)) t
 
-eps = 1e-4 -- SVT tolerance
+nuclearNorm :: H.Matrix Double -> Double
+nuclearNorm = H.sumElements . H.singularValues
+
+{-
+robustCompletion :: Double -> Double -> Double -> Observations -> [Prediction]
+robustCompletion mu0 rho lambda t =
+    let go (mu:mus) b0 e0 y0 =
+            let l1 = shrink (r0 `H.sub` b0 `H.sub` e0 `H.sub` H.scale (1/mu) y0) (1/mu)
+                b1 = H.mapMatrix (\d->if abs d <= lambda/mu
+                                        then 0 else d - signum d * lambda/mu) d0
+                e1 = proj t (r0 `H.sub` b1 `H.sub` l1 `H.sub` (1/mu `H.scale` y0))
+                y1 = y0 `H.add` H.scale mu (l1 `H.add` b1 `H.add` e1 `H.sub` r)
+                d = r `H.sub` l1 `H.sub` e1 `H.sub` H.scale (1/mu) y1
+            in d : go mus b1 e1 y1
+        Movie nMovies = S.findMax $ S.map fst $ M.keysSet t
+        User nUsers   = S.findMax $ S.map snd $ M.keysSet t
+        zeros = H.zeros (nMovies+1) (nUsers+1)
+    in go (iterate (*rho) mu) zeros zeros zeros
+-}
+
+eps = 1e-1 -- SVT tolerance
 tau = 2000
 deltas = repeat 1.9
 
@@ -105,12 +132,14 @@ main = do
     putStrLn "Test:" >> describeObservations testD
 
     rSvd <- svdThresh eps tau deltas trainD
-    let preds = [ ("movie mean",    globalMovieMean trainD)
-                , ("user mean",     globalUserMean trainD)
-                , ("SVD threshold", rSvd)
+    let preds = [ ("global mean",      globalMean trainD)
+                , ("movie mean",       globalMovieMean trainD)
+                , ("user mean",        globalUserMean trainD)
+                , ("reported mixture", mixedMean reportedMixture trainD)
+                , ("SVD threshold",    rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
-        putStrLn $ name++"\t"++show (rmse testD pred)
+        putStrLn $ (take 30 $ name++repeat ' ')++show (rmse testD pred)
 
 decodeOpts = Csv.defaultDecodeOptions { Csv.decDelimiter = fromIntegral $ ord '\t' }
 
