@@ -71,8 +71,8 @@ svdThresh tol tau deltas t = do
                            then putStrLn ("error = "++show err) >> go rs
                            else return r
         t' = obsToHMatrix t
-        relError r = froebeniusNorm (proj t (t' `H.sub` r))
-                     / froebeniusNorm (proj t t')
+        normTProj = froebeniusNorm (proj t t')
+        relError r = froebeniusNorm (proj t (t' `H.sub` r)) / normTProj
         predict r (Movie m) (User u) = r H.@@> (m,u)
 
 -- | Generate a list of recommendation iterates @R_q@
@@ -100,24 +100,37 @@ proj t r =
 nuclearNorm :: H.Matrix Double -> Double
 nuclearNorm = H.sumElements . H.singularValues
 
-{-
-robustCompletion :: Double -> Double -> Double -> Observations -> [Prediction]
+robustCompletion :: Double -> Double -> Double -> Observations -> IO Prediction
 robustCompletion mu0 rho lambda t =
+    let go (a:as) = let error = rmse t (predict a)
+                    in do print error
+                          go as
+        predict a = \(Movie m) (User u) -> a H.@@> (m,u)
+    in go $ robustCompletion' mu0 rho lambda t
+
+robustCompletion' :: Double -> Double -> Double -> Observations -> [H.Matrix Double]
+robustCompletion' mu0 rho lambda t =
     let go (mu:mus) b0 e0 y0 =
-            let l1 = shrink (r0 `H.sub` b0 `H.sub` e0 `H.sub` H.scale (1/mu) y0) (1/mu)
+            let l1 = shrink (1/mu) (r `H.sub` b0 `H.sub` e0 `H.sub` H.scale (1/mu) y0)
+                d0 = r `H.sub` l1 `H.sub` e0 `H.sub` H.scale (1/mu) y0
                 b1 = H.mapMatrix (\d->if abs d <= lambda/mu
                                         then 0 else d - signum d * lambda/mu) d0
-                e1 = proj t (r0 `H.sub` b1 `H.sub` l1 `H.sub` (1/mu `H.scale` y0))
+                e1 = projComp t (r `H.sub` b1 `H.sub` l1 `H.sub` (1/mu `H.scale` y0))
                 y1 = y0 `H.add` H.scale mu (l1 `H.add` b1 `H.add` e1 `H.sub` r)
-                d = r `H.sub` l1 `H.sub` e1 `H.sub` H.scale (1/mu) y1
-            in d : go mus b1 e1 y1
+            in l1 : go mus b1 e1 y1
+        r = obsToHMatrix t
         Movie nMovies = S.findMax $ S.map fst $ M.keysSet t
         User nUsers   = S.findMax $ S.map snd $ M.keysSet t
         zeros = H.zeros (nMovies+1) (nUsers+1)
-    in go (iterate (*rho) mu) zeros zeros zeros
--}
+    in go (iterate (*rho) mu0) zeros zeros zeros
 
-eps = 1e-1 -- SVT tolerance
+-- | Project into the complement of t
+projComp :: Observations -> H.Matrix Double -> H.Matrix Double
+projComp t =
+    H.mapMatrixWithIndex (\(m,u) r->if (Movie m, User u) `M.member` t
+                                      then 0 else r)
+
+eps = 5e-1 -- SVT tolerance
 tau = 2000
 deltas = repeat 1.9
 
@@ -132,11 +145,13 @@ main = do
     putStrLn "Test:" >> describeObservations testD
 
     rSvd <- svdThresh eps tau deltas trainD
-    let preds = [ ("global mean",      globalMean trainD)
-                , ("movie mean",       globalMovieMean trainD)
-                , ("user mean",        globalUserMean trainD)
-                , ("reported mixture", mixedMean reportedMixture trainD)
-                , ("SVD threshold",    rSvd)
+    rRobust <- robustCompletion 1 0.2 0.1 trainD
+    let preds = [ ("global mean",       globalMean trainD)
+                , ("movie mean",        globalMovieMean trainD)
+                , ("user mean",         globalUserMean trainD)
+                , ("reported mixture",  mixedMean reportedMixture trainD)
+                , ("robust completion", rRobust)
+                , ("SVD threshold",     rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
         putStrLn $ (take 30 $ name++repeat ' ')++show (rmse testD pred)
