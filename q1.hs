@@ -95,7 +95,10 @@ main = do
     print constraints
     let p0' = project p0
     print $ objective `dot` p0'
-    forM_ (optimize p0') $ \p->print (objective `dot` p, p)
+    forM_ (optimize p0') $ \p->do
+      putStr $ objective `dot` p
+      putStr "\t"
+      putStrLn $ show p
 
 data Constraint f a = Constr Ordering a (f a)
                     deriving (Show)
@@ -107,9 +110,8 @@ constraints =
  ++ F.toList ((\d l->Constr LT d $ set (xs.mapped.l) 1 zero)                -- (C3)
               <$> ds <*> Blends b1 b2 b3)
  ++ F.toList ((\r l l'->Constr GT 0                                         -- (C4)
-                     $ (over xs (\x ->(*^)<$> os <*> x)
-                         $ set (xs.mapped.l) 1 zero
-                       ) ^-^ set (xs.mapped.l') r zero)
+                     $ (over xs (\x ->(*^)<$> os <*> x) $ set (xs.mapped.l) 1 zero)
+                       ^-^ set (xs.mapped.l') r zero)
               <$> rs <*> Blends b1 b2 b3 <*> Blends b1 b2 b3)
  ++ map (\rb->Constr GT 0 $ set (xs.rb) 1 zero)                             -- x >= 0
         (do r <- [r1, r2, r3, r4]
@@ -129,9 +131,9 @@ project c@(Config {..}) =
         ap (Constr _ b a) c = a `dot` c - b
         met c (Constr t a constr) = let y = constr `dot` c - a
                                     in case t of
-                                       EQ -> abs y < 10
-                                       GT -> y >= 0
-                                       LT -> y <= 0
+                                       EQ -> abs y < 1e-1
+                                       GT -> y >= 0 || abs y < 1e-1
+                                       LT -> y <= 0 || abs y < 1e-1
         fixConstraint c (Constr _ b a) = c ^-^ (a `dot` c - b) *^ a ^/ quadrance a
 
 -- | Minimize the given objective
