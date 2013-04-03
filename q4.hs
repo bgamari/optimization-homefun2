@@ -3,15 +3,18 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Statistics.Sample
 import Data.Foldable as F
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Linear
+import Data.Distributive
 import qualified Numeric.LinearAlgebra as H
 import qualified Numeric.LinearAlgebra.Util as H
 import qualified Data.Csv as Csv
 import Data.Char (ord)
 import qualified Data.ByteString.Lazy as BS
 import Control.Applicative
+import Data.Traversable as T
 import System.Environment (getArgs)
 import Debug.Trace
 
@@ -130,6 +133,35 @@ projComp t =
     H.mapMatrixWithIndex (\(m,u) r->if (Movie m, User u) `M.member` t
                                       then 0 else r)
 
+compToLinear :: Observations -> Map Movie (Map User Rating)
+compToLinear =
+    M.unionsWith M.union . map (\((m,u),r)->M.singleton m (M.singleton u r)) . M.assocs
+
+-- | Non-negative matrix factorization with non-increasing Euclidean distance
+nmf :: (H.Product a, Fractional a, Ord a)
+    => Int                        -- ^ The rank of the resulting decomposition
+    -> H.Matrix a                 -- ^ Initial W
+    -> H.Matrix a                 -- ^ Initial H
+    -> H.Matrix a                 -- ^ The matrix to be factored
+    -> [(H.Matrix a, H.Matrix a)]
+nmf r w0 h0 v = go w0 h0
+  where go w0 h0 = let wv  = H.trans w0 `H.mXm` v
+                       vh  = v  `H.mXm` H.trans h0
+                       eps = 1e-5
+                       wwh = H.mapMatrix (max eps) $ H.trans w0 `H.mXm` w0 `H.mXm` h0
+                       whh = H.mapMatrix (max eps) $ w0 `H.mXm` h0 `H.mXm` H.trans h0
+                       w1  = H.mapMatrixWithIndex (\i w->w * vh H.@@> i / whh H.@@> i) w0
+                       h1  = H.mapMatrixWithIndex (\i h->h * wv H.@@> i / wwh H.@@> i) h0
+                   in (w1,h1) : go w1 h1
+
+nmfPredict :: Int -> H.Matrix Double -> [Prediction]
+nmfPredict r v = map predict $ nmf r w0 h0 v
+  where predict (w,h) = let v = w `H.mXm` h
+                        in \(Movie m) (User u) -> v H.@@> (m,u)
+        w0 = H.diagRect 0 (H.buildVector r (const 1)) n r
+        h0 = H.diagRect 0 (H.buildVector r (const 1)) r m
+        (n,m) = (H.rows v, H.cols v)
+
 eps = 5e-1 -- SVT tolerance
 tau = 2000
 deltas = repeat 1.9
@@ -144,14 +176,16 @@ main = do
     putStrLn "Training:" >> describeObservations trainD
     putStrLn "Test:" >> describeObservations testD
 
-    rSvd <- svdThresh eps tau deltas trainD
+    --rSvd <- svdThresh eps tau deltas trainD
     --rRobust <- robustCompletion 1 0.2 0.1 trainD
+    let nmf50 = head $ drop 10 $ nmfPredict 100 (obsToHMatrix trainD)
     let preds = [ ("global mean",       globalMean trainD)
                 , ("movie mean",        globalMovieMean trainD)
                 , ("user mean",         globalUserMean trainD)
                 , ("reported mixture",  mixedMean reportedMixture trainD)
                 -- , ("robust completion", rRobust)
-                , ("SVD threshold",     rSvd)
+                , ("NMF 50",            nmf50)
+                -- , ("SVD threshold",     rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
         putStrLn $ (take 30 $ name++repeat ' ')++show (rmse testD pred)
