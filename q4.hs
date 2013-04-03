@@ -145,12 +145,12 @@ main = do
     putStrLn "Test:" >> describeObservations testD
 
     rSvd <- svdThresh eps tau deltas trainD
-    rRobust <- robustCompletion 1 0.2 0.1 trainD
+    --rRobust <- robustCompletion 1 0.2 0.1 trainD
     let preds = [ ("global mean",       globalMean trainD)
                 , ("movie mean",        globalMovieMean trainD)
                 , ("user mean",         globalUserMean trainD)
                 , ("reported mixture",  mixedMean reportedMixture trainD)
-                , ("robust completion", rRobust)
+                -- , ("robust completion", rRobust)
                 , ("SVD threshold",     rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
