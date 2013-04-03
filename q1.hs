@@ -69,14 +69,13 @@ rs = Blends 95 90 85
 
 data Config a = Config { _xs :: Raws (Blends a)
                        , _ys :: Raws a
-                       , _zs :: Blends a
                        }
               deriving (Show, Read, Generic, Functor, Foldable, Traversable)
 makeLenses ''Config
 instance Applicative Config where
-    pure a = Config (pure $ pure a) (pure a) (pure a)
-    Config x1 y1 z1 <*> Config x2 y2 z2 =
-        Config ((<*>) <$> x1 <*> x2) (y1 <*> y2) (z1 <*> z2)
+    pure a = Config (pure $ pure a) (pure a)
+    Config x1 y1 <*> Config x2 y2 =
+        Config ((<*>) <$> x1 <*> x2) (y1 <*> y2)
 instance Additive Config where zero = pure 0
 instance Metric Config
 
@@ -84,12 +83,11 @@ instance Metric Config
 objective :: Fractional a => Config a
 objective = negated $ f2 ^+^ f3 ^-^ f1
   where f1 = set ys ps zero
-        f2 = set zs p's zero
+        f2 = set (xs.mapped) p's zero
         f3 = set ys es zero ^-^ set xs (fmap pure es) zero
 
 p0 = Config { _xs = Raws (pure 100) (pure 100) (pure 100) (pure 100)
             , _ys = Raws 1000 1000 1000 1000
-            , _zs = Blends 1000 1000 1000
             }
 
 main = do
@@ -104,23 +102,20 @@ data Constraint f a = Constr Ordering a (f a)
 
 constraints :: (Fractional a, Ord a) => [Constraint Config a]
 constraints =
-    map (\b->Constr EQ 0
-             $ set (xs.mapped.b) 1 zero ^-^ set (zs.b) 1 zero) [b1, b2 ,b3] -- (C1)
- ++ F.toList ((\b r->Constr LT b $ set (xs.r.mapped) 1 zero)                -- (C2)
+    F.toList ((\b r->Constr LT b $ set (xs.r.mapped) 1 zero)                -- (C2)
               <$> bs <*> Raws r1 r2 r3 r4)
- ++ F.toList ((\d l->Constr LT d $ set (zs.l) 1 zero)                       -- (C3)
+ ++ F.toList ((\d l->Constr LT d $ set (xs.mapped.l) 1 zero)                -- (C3)
               <$> ds <*> Blends b1 b2 b3)
  ++ F.toList ((\r l l'->Constr GT 0                                         -- (C4)
                      $ (over xs (\x ->(*^)<$> os <*> x)
                          $ set (xs.mapped.l) 1 zero
-                       ) ^-^ set (zs.l') r zero)
+                       ) ^-^ set (xs.mapped.l') r zero)
               <$> rs <*> Blends b1 b2 b3 <*> Blends b1 b2 b3)
  ++ map (\rb->Constr GT 0 $ set (xs.rb) 1 zero)                             -- x >= 0
         (do r <- [r1, r2, r3, r4]
             b <- [b1, b2, b3]
             return $ r.b)
  ++ map (\r->Constr GT 0 $ set (ys.r) 1 zero) [r1, r2, r3, r4]              -- y >= 0
- ++ map (\b->Constr GT 0 $ set (zs.b) 1 zero) [b1, b2, b3]                  -- z >= 0
 
 project :: (Fractional a, Ord a, Show a, RealFloat a) => Config a -> Config a
 project c@(Config {..}) =
