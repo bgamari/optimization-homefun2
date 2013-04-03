@@ -104,29 +104,40 @@ data Constraint f a = Constr Ordering a (f a)
 
 constraints :: (Fractional a, Ord a) => [Constraint Config a]
 constraints =
-    map (\b->Constr EQ 0 $ set (xs.mapped.b) 1 zero ^-^ set (zs.b) 1 zero) [b1, b2 ,b3]
- ++ F.toList ((\b r->Constr GT b $ set (xs.cloneLens r.mapped) 1 zero) <$> bs <*> Raws r1 r2 r3 r4)
- -- ++ F.toList ((\b l->Constr GT b $ negated $ set (zs.cloneLens l) 1 zero) <$> ds <*> Blends b1 b2 b3)
- -- ++ F.toList ((\r l->Constr GT 0 $ negated $ set (xs.mapped.l) os zero ^-^ set (zs.l') r zero) <$> rs <*> Blends b1 b2 b3)
- ++ map (\rb->Constr GT 0 $ set (xs.rb) 1 zero) (do r <- [r1, r2, r3, r4]
-                                                    b <- [b1, b2, b3]
-                                                    return $ r.b)
- ++ map (\r->Constr GT 0 $ set (ys.r) 1 zero) [r1, r2, r3, r4]
- ++ map (\b->Constr GT 0 $ set (zs.b) 1 zero) [b1, b2, b3]
+    map (\b->Constr EQ 0
+             $ set (xs.mapped.b) 1 zero ^-^ set (zs.b) 1 zero) [b1, b2 ,b3] -- (C1)
+ ++ F.toList ((\b r->Constr LT b $ set (xs.r.mapped) 1 zero)                -- (C2)
+              <$> bs <*> Raws r1 r2 r3 r4)
+ ++ F.toList ((\d l->Constr LT d $ set (zs.l) 1 zero)                       -- (C3)
+              <$> ds <*> Blends b1 b2 b3)
+ ++ F.toList ((\r l l'->Constr GT 0                                         -- (C4)
+                     $ (over xs (\x ->(*^)<$> os <*> x)
+                         $ set (xs.mapped.l) 1 zero
+                       ) ^-^ set (zs.l') r zero)
+              <$> rs <*> Blends b1 b2 b3 <*> Blends b1 b2 b3)
+ ++ map (\rb->Constr GT 0 $ set (xs.rb) 1 zero)                             -- x >= 0
+        (do r <- [r1, r2, r3, r4]
+            b <- [b1, b2, b3]
+            return $ r.b)
+ ++ map (\r->Constr GT 0 $ set (ys.r) 1 zero) [r1, r2, r3, r4]              -- y >= 0
+ ++ map (\b->Constr GT 0 $ set (zs.b) 1 zero) [b1, b2, b3]                  -- z >= 0
 
 project :: (Fractional a, Ord a, Show a, RealFloat a) => Config a -> Config a
 project c@(Config {..}) =
     case unmet of
       []          -> c
-      otherwise   -> traceShow (length unmet, map (\x->showFFloat (Just 1) x "") $ map (`ap` c) constraints) $
+      otherwise   -> --traceShow ( map snd $ filter (not . met c . fst) $ zip constraints [0..]
+                     --          , F.concatMap (\x->showFFloat (Just 1) x "  ") $ map (`ap` c) constraints
+                     --          ) $
                      project $ fixConstraint c $ maximumBy (flip compare `on` (`ap` c)) unmet
   where unmet = filter (not . met c) constraints
         ap (Constr _ b a) c = a `dot` c - b
-        met c (Constr EQ a constr) = abs (constr `dot` c - a) < 10
-        met c (Constr GT a constr) = let y = constr `dot` c - a in y >= 0 && abs y < 10
-        fixConstraint c (Constr _ b a) =
-            --traceShow ("Solving", a `dot` c - b, b, a,c) $
-            c ^-^ (a `dot` c - b) *^ a ^/ quadrance a
+        met c (Constr t a constr) = let y = constr `dot` c - a
+                                    in case t of
+                                       EQ -> abs y < 10
+                                       GT -> y >= 0
+                                       LT -> y <= 0
+        fixConstraint c (Constr _ b a) = c ^-^ (a `dot` c - b) *^ a ^/ quadrance a
 
 -- | Minimize the given objective
 projGradientDescent :: (Additive f, Traversable f, Metric f, Ord a, Fractional a, Show a)
