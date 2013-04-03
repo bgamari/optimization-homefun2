@@ -86,17 +86,20 @@ objective = negated $ f2 ^+^ f3 ^-^ f1
         f2 = set (xs.mapped) p's zero
         f3 = set ys es zero ^-^ set xs (fmap pure es) zero
 
+p0 :: Config Double
 p0 = Config { _xs = Raws (pure 100) (pure 100) (pure 100) (pure 100)
             , _ys = Raws 1000 1000 1000 1000
             }
 
 main = do
-    print $ objective `dot` p0
-    print constraints
     let p0' = project p0
-    print $ objective `dot` p0'
-    forM_ (optimize p0') $ \p->do
-      putStr $ objective `dot` p
+    let constant = repeat 10
+        nonSummable = map (\k->0.1 / sqrt k) [1..]
+        squareSummable = map (\k->1 / k) [1..]
+        stepSizes = constant
+
+    forM_ (optimize stepSizes p0') $ \p->do
+      putStr $ show $ objective `dot` p
       putStr "\t"
       putStrLn $ show p
 
@@ -138,18 +141,15 @@ project c@(Config {..}) =
 
 -- | Minimize the given objective
 projGradientDescent :: (Additive f, Traversable f, Metric f, Ord a, Fractional a, Show a)
-                    => (f a -> f a) -> f a -> a -> f a -> [f a]
-projGradientDescent proj a b = go
-  where go x0 = let p = negated $ df x0
-                    alpha0 = armijoSearch 0.1 20 0.2 f df p x0
-                    x1 = traceShow alpha0 $ proj $ x0 ^+^ alpha0 *^ p
-                in x1 : go x1
+                    => [a] -> (f a -> f a) -> f a -> a -> f a -> [f a]
+projGradientDescent stepSizes proj a b = go stepSizes
+  where go (alpha:stepSizes) x0 =
+            let p = negated $ df x0
+                x1 = proj $ x0 ^+^ alpha *^ p
+            in x1 : go stepSizes x1
         df x = a
         f x = a `dot` x - b
 
-gradientDescent :: (Additive f, Traversable f, Metric f, Ord a, Fractional a, Show a)
-                => f a -> a -> f a -> [f a]
-gradientDescent = projGradientDescent id
-
-optimize :: (Fractional a, Ord a, Show a, RealFloat a) => Config a -> [Config a]
-optimize = projGradientDescent project objective 0
+optimize :: (Fractional a, Ord a, Show a, RealFloat a)
+         => [a] -> Config a -> [Config a]
+optimize stepSizes = projGradientDescent stepSizes project objective 0
