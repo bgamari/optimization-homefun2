@@ -75,13 +75,19 @@ summable but not summable we find,
 
 \begin{figure}
   \center
-  \includegraphics[scale=0.2]{q2-convergence.pdf}
+  \includegraphics[scale=0.5]{q2-convergence.pdf}
   \caption{(Question 2) Convergence of projected subgradient method
 while minimizing the linear program $f(x) = x_1 + 2x_2 - 1$ such that
 $x_1, x_2 \ge 0$ and $x_1 + x_2 = 1$ under the step size schedule
 $\alpha_k = f(x_k) / \norm{\langle 1,2\rangle}$.}
   \label{Fig:Q2Convergence}
 \end{figure}
+
+The optimal step size schedule for the given linear
+program seems to converge as would be expected; I'm not sure why its
+behavior would be labelled as puzzling. The gradient is mostly
+orthogonal to the constraint line $x_1 + x_2 = 1$, leading to poor
+convergence.
 
 \section{Question 3}
 

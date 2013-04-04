@@ -18,6 +18,12 @@ obj = lambda x1,x2: x1 + 2*x2 - 1
 pl.subplot(211)
 pl.plot(g[:,0], g[:,1])
 pl.plot([0,1], [1,0], c='k')
+
+pl.xlim(-0.2, 1)
+pl.ylim(-0.2, 1)
+
+xs,ys = np.meshgrid(np.linspace(-0.2, 1), np.linspace(-0.2, 1))
+pl.imshow(obj(xs, ys), extent=[-0.2, 1, -0.2, 1], origin='lower')
 pl.xlabel('$x_1$')
 pl.ylabel('$x_2$')
 
