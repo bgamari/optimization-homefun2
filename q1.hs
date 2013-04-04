@@ -134,9 +134,9 @@ project c@(Config {..}) =
         ap (Constr _ b a) c = a `dot` c - b
         met c (Constr t a constr) = let y = constr `dot` c - a
                                     in case t of
-                                       EQ -> abs y < 1e-1
-                                       GT -> y >= 0 || abs y < 1e-1
-                                       LT -> y <= 0 || abs y < 1e-1
+                                       EQ -> abs y < 1e-4
+                                       GT -> y >= 0 || abs y < 1e-4
+                                       LT -> y <= 0 || abs y < 1e-4
         fixConstraint c (Constr _ b a) = c ^-^ (a `dot` c - b) *^ a ^/ quadrance a
 
 -- | Minimize the given objective
