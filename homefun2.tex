@@ -25,8 +25,10 @@ is closed (that is $\mathrm{cl} F = F$).
 
 As all of the $f_j$ are convex, we know that $\epi f_j$ are
 closed for all $j$. Under our definition of $f$, we can consider $\epi
-f$ to be the intersection of all $\epi f_j$. By *** we know that the
-intersection of any number of closed sets is itself closed.
+f$ to be the intersection of all $\epi f_j$. By nearly any
+introductory topology text (e.g. Mendelson's {\it Introduction to
+Topology}, Dover 1990) we know that the intersection of any number of
+closed sets is itself closed.
 
 Assuming we have a subgradient $g_i(x) = \partial f_i(x)$ for each
 $f_i$, we can define the subgradient $g(x) = \partial f(x)$ to be
@@ -37,6 +39,15 @@ we may choose from the subgradients of any of these maximal functions.
 In the case of $f(x) = \norm{x}_1$, we note that we can express this as,
 \[ f(x) = \mathrm{max} \{ x_1 x_2 \ldots x_N, (-x_1) x_2 \ldots x_N, \ldots, (-x_1) (-x_2) \ldots (-x_N) \} \]
 Using the rule proposed above, we can take $g(x) = TODO$
+
+\begin{figure}
+  \center
+  \includegraphics[scale=0.5]{q1-convergence.pdf}
+  \caption{(Question 1) Convergence of projected subgradient method
+while minimizing the linear program described in Question 2 of Homefun
+1 for three step size schedules.}
+  \label{Fig:Q1Convergence}
+\end{figure}
 
 See attached for implementation.
 
@@ -115,7 +126,7 @@ summable but not summable we find,
   \[ p(x \vert \theta) = e^{-x^T \theta - \psi(\theta) - g_\psi(x)} \]
   Note that this is not the canonical form of the exponential family;
 a negative sign has been added to the term in both $x$ and
-$theta$. This sign is necessary for $\theta = \lambda$ so that the
+$\theta$. This sign is necessary for $\theta = \lambda$ so that the
 function $\psi$ matches what we expect.
 \end{enumerate}
 
