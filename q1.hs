@@ -110,8 +110,8 @@ constraints :: (Fractional a, Ord a) => [Constraint Config a]
 constraints =
     F.toList ((\b r->Constr LT b $ set (xs.r.mapped) 1 zero)                -- (C2)
               <$> bs <*> Raws r1 r2 r3 r4)
- ++ F.toList ((\d l->Constr LT d $ set (xs.mapped.l) 1 zero)                -- (C3)
-              <$> ds <*> Blends b1 b2 b3)
+ ++ F.toList ((\d->Constr LT d $ set (ys.mapped) 1 zero)                    -- (C3)
+              <$> ds)
  ++ F.toList ((\r l l'->Constr GT 0                                         -- (C4)
                      $ (over xs (\x ->(*^)<$> os <*> x) $ set (xs.mapped.l) 1 zero)
                        ^-^ set (xs.mapped.l') r zero)
