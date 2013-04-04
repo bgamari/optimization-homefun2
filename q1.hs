@@ -12,7 +12,7 @@ import Data.Traversable
 import GHC.Generics
 import Linear hiding (trace)
 import Control.Lens
-import Optimization.LineSearch
+import Optimization.Constrained.ProjectedSubgradient
 
 import Debug.Trace
 import Numeric
@@ -93,18 +93,15 @@ p0 = Config { _xs = Raws (pure 100) (pure 100) (pure 100) (pure 100)
 
 main = do
     let p0' = project p0
-    let constant = repeat
-        nonSummable g = map (\k->g / sqrt k) [1..]
-        squareSummable g = map (\k->g / k) [1..]
-        stepSizes = constant 20
+        stepSizes = constStepSched 20
 
     forM_ (optimize stepSizes p0') $ \p->do
       putStr $ show $ objective `dot` p
       putStr "\t"
       putStrLn $ show p
 
-data Constraint f a = Constr Ordering a (f a)
-                    deriving (Show)
+project :: (RealFloat a, Ord a) => Config a -> Config a
+project = linearProjection constraints
 
 constraints :: (Fractional a, Ord a) => [Constraint Config a]
 constraints =
@@ -122,34 +119,7 @@ constraints =
             return $ r.b)
  ++ map (\r->Constr GT 0 $ set (ys.r) 1 zero) [r1, r2, r3, r4]              -- y >= 0
 
-project :: (Fractional a, Ord a, Show a, RealFloat a) => Config a -> Config a
-project c@(Config {..}) =
-    case unmet of
-      []          -> c
-      otherwise   -> --traceShow ( map snd $ filter (not . met c . fst) $ zip constraints [0..]
-                     --          , F.concatMap (\x->showFFloat (Just 1) x "  ") $ map (`ap` c) constraints
-                     --          ) $
-                     project $ fixConstraint c $ maximumBy (flip compare `on` (`ap` c)) unmet
-  where unmet = filter (not . met c) constraints
-        ap (Constr _ b a) c = a `dot` c - b
-        met c (Constr t a constr) = let y = constr `dot` c - a
-                                    in case t of
-                                       EQ -> abs y < 1e-4
-                                       GT -> y >= 0 || abs y < 1e-4
-                                       LT -> y <= 0 || abs y < 1e-4
-        fixConstraint c (Constr _ b a) = c ^-^ (a `dot` c - b) *^ a ^/ quadrance a
-
--- | Minimize the given objective
-projGradientDescent :: (Additive f, Traversable f, Metric f, Ord a, Fractional a, Show a)
-                    => [a] -> (f a -> f a) -> f a -> a -> f a -> [f a]
-projGradientDescent stepSizes proj a b = go stepSizes
-  where go (alpha:stepSizes) x0 =
-            let p = negated $ df x0
-                x1 = proj $ x0 ^+^ alpha *^ p
-            in x1 : go stepSizes x1
-        df x = a
-        f x = a `dot` x - b
-
-optimize :: (Fractional a, Ord a, Show a, RealFloat a)
-         => [a] -> Config a -> [Config a]
-optimize stepSizes = projGradientDescent stepSizes project objective 0
+optimize :: (Fractional a, Ord a, RealFloat a)
+         => StepSched Config a -> Config a -> [Config a]
+optimize stepSizes =
+    linearProjSubgrad stepSizes project objective 0
