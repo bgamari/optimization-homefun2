@@ -1,6 +1,12 @@
-import Linear
-import Control.Monad
+import Linear hiding (trace)
 import Optimization.Constrained.ProjectedSubgradient
+import Debug.Trace
+import Numeric
+import Data.Foldable
+import Data.List
+
+showV2 :: V2 Double -> String
+showV2 = intercalate " " . toList . fmap (\x->showFFloat (Just 5) x "")
 
 a = V2 1 2
 b = 1
@@ -12,6 +18,7 @@ constraints = [ Constr EQ 1 (V2 1 1)
               ]
 
 main = do
-    let steps = optimalStepSched (-1)
-        proj = linearProjection constraints
-    forM_ (linearProjSubgrad steps proj a b x0) print
+    let steps = optimalStepSched 0
+        proj = linearProjection constraints . \x->trace (showV2 x) x
+    forM_ (linearProjSubgrad steps proj a b x0) $ \x->
+        putStrLn $ showV2 x++"\t"++show (a `dot` x - b)

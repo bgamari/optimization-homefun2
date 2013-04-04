@@ -93,10 +93,10 @@ p0 = Config { _xs = Raws (pure 100) (pure 100) (pure 100) (pure 100)
 
 main = do
     let p0' = project p0
-    let constant = repeat 10
-        nonSummable = map (\k->0.1 / sqrt k) [1..]
-        squareSummable = map (\k->1 / k) [1..]
-        stepSizes = constant
+    let constant = repeat
+        nonSummable g = map (\k->g / sqrt k) [1..]
+        squareSummable g = map (\k->g / k) [1..]
+        stepSizes = constant 20
 
     forM_ (optimize stepSizes p0') $ \p->do
       putStr $ show $ objective `dot` p

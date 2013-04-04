@@ -71,7 +71,7 @@ svdThresh tol tau deltas t = do
     return $ predict rStar
   where go (r:rs) = let err = relError r
                     in if err > tol
-                           then putStrLn ("error = "++show err) >> go rs
+                           then putStrLn ("SVT error = "++show err) >> go rs
                            else return r
         t' = obsToHMatrix t
         normTProj = froebeniusNorm (proj t t')
@@ -96,6 +96,7 @@ shrink tau x = let (u,s,v) = H.thinSVD x
                    s' = H.diag $ H.mapVector (\x->max (x-tau) 0) s
                in u `H.mXm` s' `H.mXm` H.trans v
 
+-- | Project recommendations onto observations
 proj :: Observations -> H.Matrix Double -> H.Matrix Double
 proj t r =
     obsToHMatrix $ M.mapWithKey (\(Movie m, User u) _ -> r H.@@> (m,u)) t
@@ -162,8 +163,7 @@ nmfPredict r v = map predict $ nmf r w0 h0 v
         h0 = H.diagRect 0 (H.buildVector r (const 1)) r m
         (n,m) = (H.rows v, H.cols v)
 
-eps = 5e-1 -- SVT tolerance
-tau = 2000
+tau = 6000
 deltas = repeat 1.9
 
 main = do
@@ -176,7 +176,7 @@ main = do
     putStrLn "Training:" >> describeObservations trainD
     putStrLn "Test:" >> describeObservations testD
 
-    --rSvd <- svdThresh eps tau deltas trainD
+    rSvd <- svdThresh 0.2 tau deltas trainD
     --rRobust <- robustCompletion 1 0.2 0.1 trainD
     let nmf50 = head $ drop 10 $ nmfPredict 100 (obsToHMatrix trainD)
     let preds = [ ("global mean",       globalMean trainD)
@@ -185,7 +185,7 @@ main = do
                 , ("reported mixture",  mixedMean reportedMixture trainD)
                 -- , ("robust completion", rRobust)
                 , ("NMF 50",            nmf50)
-                -- , ("SVD threshold",     rSvd)
+                 , ("SVD threshold",     rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
         putStrLn $ (take 30 $ name++repeat ' ')++show (rmse testD pred)
