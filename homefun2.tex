@@ -49,7 +49,7 @@ while minimizing the linear program described in Question 2 of Homefun
   \label{Fig:Q1Convergence}
 \end{figure}
 
-See attached for implementation.
+See \ref{Q1Source} for implementation.
 
 \section{Question 2}
 
@@ -88,6 +88,8 @@ program seems to converge as would be expected; I'm not sure why its
 behavior would be labelled as puzzling. The gradient is mostly
 orthogonal to the constraint line $x_1 + x_2 = 1$, leading to poor
 convergence.
+
+See \ref{Q2Source} for implementation.
 
 \section{Question 3}
 
@@ -147,7 +149,27 @@ function $\psi$ matches what we expect.
 
 \section{Question 4}
 
-TODO
+\ref{Q4Source} shows an implementation of the methods,
+
+\begin{itemize}
+\item Global mean
+\item Movie mean
+\item User mean
+\item Mixed mean
+\item SVD thresholding
+\item Robust completion
+\item Non-negative matrix factorization
+\end{itemize}
+
+The performance of the mean methods all roughly agree with the results
+reported in the paper. The SVT method unfortunately performs
+substantially worse than the paper's reported performance. After a
+great deal of debugging I unfortunately have little in the way of
+explanation. Debugging was complicated by the long runtimes due to the
+fact that I do not have access to a sparse SVD
+implementation. Regardless, the evolution of RMSE over iterations is
+shown in \ref{Q4Convergence}.
+
 
 \appendix
 
