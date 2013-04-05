@@ -36,9 +36,15 @@ the corresponding subgradient $g_j$ of the maximal function $f_j \ge
 f_i \forall i \ne j$. At points where multiple functions are maximal,
 we may choose from the subgradients of any of these maximal functions.
 
-In the case of $f(x) = \norm{x}_1$, we note that we can express this as,
-\[ f(x) = \mathrm{max} \{ x_1 x_2 \ldots x_N, (-x_1) x_2 \ldots x_N, \ldots, (-x_1) (-x_2) \ldots (-x_N) \} \]
-Using the rule proposed above, we can take $g(x) = TODO$
+In the case of $f(\vec x) = \norm{\vec x}_1$, we note that we can express this as,
+\[ f(\vec x) = \mathrm{max} \left\{ (x_1+x_2 \ldots x_N), (-x_1+x_2 \ldots x_N), (\ldots, -x_1-x_2 \ldots -x_N) \right\} \]
+Using the rule proposed above, we can take,
+\[ g(\vec x)_i = \left\{ \begin{array}{lr}
+                     -1   & : x_i < 0 \\
+                     +1   & : x_i > 0 \\
+                     0    & \mathrm{otherwise} \\
+                     \end{array}
+                 \right. \]
 
 \begin{figure}
   \center
