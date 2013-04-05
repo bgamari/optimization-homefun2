@@ -156,9 +156,9 @@ function $\psi$ matches what we expect.
 \item Movie mean
 \item User mean
 \item Mixed mean
-\item SVD thresholding
+\item SVD thresholding (SVT)
 \item Robust completion
-\item Non-negative matrix factorization
+\item Non-negative matrix factorization (NMF)
 \end{itemize}
 
 The performance of the mean methods all roughly agree with the results
@@ -167,9 +167,36 @@ substantially worse than the paper's reported performance. After a
 great deal of debugging I unfortunately have little in the way of
 explanation. Debugging was complicated by the long runtimes due to the
 fact that I do not have access to a sparse SVD
-implementation. Regardless, the evolution of RMSE over iterations is
-shown in \ref{Q4Convergence}.
+implementation (although I did spend quite a bit of time trying to get
+the {\tt svdlibc} implementation working). Regardless, the evolution
+of RMSE over iterations is shown in \ref{Q4Convergence}. Robust
+completion had difficulties in converging in a reasonable amount of
+time. Finally, NMF performed worse than other methods (although little
+time was spent trying to identify the issue).
 
+\begin{table}
+\center
+\begin{tabular}{|l|rrr|}
+  \hline
+  method      & u1    & u2    & u3    \\
+  \hline
+  global mean & 1.12  & 1.11  & 1.12  \\
+  movie mean  & 0.98  & 0.98  & 0.98  \\
+  user mean   & 1.04  & 1.03  & 1.04  \\
+  mixed       & 0.96  & 0.95  & 0.95  \\
+  SVT         & 1.63  & 1.69  & 1.64  \\
+  \hline
+\end{tabular}
+\caption{(Question 4) Root-mean-squared error for 1m data sets u1, u2, and u3.}
+\end{table}
+
+\begin{figure}
+\center
+\includegraphics[scale=0.5]{q4-convergence.pdf}
+\caption{(Question 4) Convergence of SVT. Note how all three of these
+curves fall on top of one another; this is highly suggestive of a
+bug.}
+\end{figure}
 
 \appendix
 
