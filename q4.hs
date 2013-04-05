@@ -16,6 +16,7 @@ import qualified Data.ByteString.Lazy as BS
 import Control.Applicative
 import Data.Traversable as T
 import System.Environment (getArgs)
+import System.IO
 import Debug.Trace
 
 newtype Movie = Movie Int deriving (Show, Ord, Eq)
@@ -66,12 +67,14 @@ froebeniusNorm :: H.Matrix Double -> Double
 froebeniusNorm = H.sumElements . H.mapMatrix (^2)
 
 svdThresh :: Double -> Double -> [Double] -> Observations -> IO Prediction
-svdThresh tol tau deltas t = do
-    rStar <- go $ svdThresh' tau deltas t
+svdThresh tol tau deltas t = withFile "svt" WriteMode $ \f->do
+    rStar <- go f $ svdThresh' tau deltas t
     return $ predict rStar
-  where go (r:rs) = let err = relError r
-                    in if err > tol
-                           then putStrLn ("SVT error = "++show err) >> go rs
+  where go f (r:rs) = do let err = relError r
+                         hPutStrLn f $ show err
+                         putStrLn $ "SVT error = "++show err
+                         if err > tol
+                           then go f rs
                            else return r
         t' = obsToHMatrix t
         normTProj = froebeniusNorm (proj t t')
@@ -178,14 +181,14 @@ main = do
 
     rSvd <- svdThresh 0.2 tau deltas trainD
     --rRobust <- robustCompletion 1 0.2 0.1 trainD
-    let nmf50 = head $ drop 10 $ nmfPredict 100 (obsToHMatrix trainD)
+    --let nmf50 = head $ drop 10 $ nmfPredict 100 (obsToHMatrix trainD)
     let preds = [ ("global mean",       globalMean trainD)
                 , ("movie mean",        globalMovieMean trainD)
                 , ("user mean",         globalUserMean trainD)
                 , ("reported mixture",  mixedMean reportedMixture trainD)
                 -- , ("robust completion", rRobust)
-                , ("NMF 50",            nmf50)
-                 , ("SVD threshold",     rSvd)
+                -- , ("NMF 50",            nmf50)
+                , ("SVD threshold",     rSvd)
                 ]
     forM_ preds $ \(name,pred) -> do
         putStrLn $ (take 30 $ name++repeat ' ')++show (rmse testD pred)
